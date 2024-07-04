@@ -10,7 +10,7 @@ using System.IO.Compression;
 
 namespace SliverLoader
 {
-    public class Program
+    public class Loader
     {
         private static string AESKey;
         private static string AESIV;
