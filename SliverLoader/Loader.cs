@@ -147,11 +147,6 @@ namespace SliverLoader
 
             }
 
-
-
-
-
-
             byte[] sc = Decompress(compressed, CompressionAlgorithm);
             string binary = TargetBinary;
 
