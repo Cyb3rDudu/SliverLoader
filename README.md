@@ -10,17 +10,9 @@ msf6 > use auxiliary/gather/impersonate_ssl
 msf6 auxiliary(gather/impersonate_ssl) > set RHOST www.google.com
 RHOST => www.google.com
 msf6 auxiliary(gather/impersonate_ssl) > run
-[*] Running module against 172.217.21.164
-
-[*] 172.217.21.164:443 - Connecting to 172.217.21.164:443
-[*] 172.217.21.164:443 - Copying certificate from 172.217.21.164:443
-/OU=No SNI provided; please fix your client./CN=invalid2.invalid
-[*] 172.217.21.164:443 - Beginning export of certificate files
-[*] 172.217.21.164:443 - Creating looted key/crt/pem files for 172.217.21.164:443
-[+] 172.217.21.164:443 - key: /home/dudu/.msf4/loot/20240703202206_default_172.217.21.164_172.217.21.164_k_267041.key
-[+] 172.217.21.164:443 - crt: /home/dudu/.msf4/loot/20240703202206_default_172.217.21.164_172.217.21.164_c_797072.crt
-[+] 172.217.21.164:443 - pem: /home/dudu/.msf4/loot/20240703202206_default_172.217.21.164_172.217.21.164_p_382037.pem
 ```
+![Generate SSL Certificate with metasploit](./doc/img/metasploit001.png)
+
 For further handling, the certificate is copied to `/tmp/certs/` as `crt.crt`, `pem.pem` and `key.key`.
 
 ## Sliver C2 Setup
