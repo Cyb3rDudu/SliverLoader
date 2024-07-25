@@ -195,9 +195,13 @@ On the victim, the following command executes the download and staging of the ag
 <<<<<<< HEAD
 - [] amsi bypass
 - [] applocker bypass
+<<<<<<< HEAD
 - [] vba loader
 =======
 - [] Amsi bypass
 - [] Applocker bypass
 - [] Maldoc Loader Word VBA
 >>>>>>> cc37f4a (Add Note)
+=======
+- [] Maldoc Loader Word VBA
+>>>>>>> 55062fa8d75c7fc31620f8fd222f285342fca4b7
