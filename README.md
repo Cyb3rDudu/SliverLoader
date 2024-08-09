@@ -195,4 +195,6 @@ The stager implements basic av evasion like process sleep, and check for api's t
 
 ## AMSI Bypass
 
+TODO: Find c# implementations for the assembly itsself instead of utilizing the droper
+
 ## Applocker Bypass
